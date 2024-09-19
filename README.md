@@ -16,7 +16,7 @@ You may also see any lint errors in the console.
 
 ## To Login
 
-username: username
+username: admin \
 password: password
 
 **Any other credentials will be invalid for now.
