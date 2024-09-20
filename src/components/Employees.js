@@ -7,8 +7,6 @@ const Employees = () => {
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);  // State for departments
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [newEmployee, setNewEmployee] = useState('');
   const [newEmployeeDepartment, setNewEmployeeDepartment] = useState('');  // Track department for new employee
   const [newEmployeeError, setNewEmployeeError] = useState('');  // Error message for new employee name
@@ -20,17 +18,16 @@ const Employees = () => {
   const [editDepartmentError, setEditDepartmentError] = useState('');  // Error message for edited employee department
 
   useEffect(() => {
-    fetchEmployees(page);
-    fetchDepartments();  // Fetch departments when component loads
-  }, [page]);
+    fetchEmployees();
+    fetchDepartments();
+  }, []);
 
   // Fetch employees with pagination
-  const fetchEmployees = (page) => {
+  const fetchEmployees = () => {
     setLoading(true);
-    EmployeeService.getAllEmployees(page, 5)
+    EmployeeService.getAllEmployees(0, 1000)
       .then((response) => {
         setEmployees(response.data.content);
-        setTotalPages(response.data.totalPages);
         setLoading(false);
       })
       .catch((error) => {

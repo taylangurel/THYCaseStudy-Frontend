@@ -8,7 +8,7 @@ const Login = () => {
   const [error, setError] = useState('');
 
   const handleLogin = (e) => {
-    e.preventDefault();
+    e.preventDefault(); // Prevents the page from reloading or navigating away when the form is submitted
     axios
       .post('http://localhost:8080/authenticate', { username, password })
       .then((response) => {

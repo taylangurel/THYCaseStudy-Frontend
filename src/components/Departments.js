@@ -3,26 +3,25 @@ import DepartmentService from '../services/DepartmentService';
 import { Button, TextField, Card, CardContent, CardActions, Typography, Grid2, CircularProgress, Container } from '@mui/material';
 
 const Departments = () => {
-  const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [newDepartment, setNewDepartment] = useState('');
   const [newDepartmentError, setNewDepartmentError] = useState('');  // For validation
   const [editingDepartment, setEditingDepartment] = useState(null);
   const [editedDepartmentName, setEditedDepartmentName] = useState('');
   const [editedDepartmentError, setEditedDepartmentError] = useState('');  // For validation
+  const [searchTerm, setSearchTerm] = useState('');  // State to store the search term
+  const [allDepartments, setAllDepartments] = useState([]);
 
+  //The empty array [] passed as the second argument means that this useEffect will only run once, when the component is mounted
   useEffect(() => {
-    fetchDepartments(page);
-  }, [page]);
+    fetchDepartments();
+  }, []);
 
-  const fetchDepartments = (page) => {
+  const fetchDepartments = () => {
     setLoading(true);
-    DepartmentService.getAllDepartments(page, 5)
+    DepartmentService.getAllDepartments(0, 1000)  // Fetch the first page with 1000 data inside it
       .then((response) => {
-        setDepartments(response.data.content);
-        setTotalPages(response.data.totalPages);
+        setAllDepartments(response.data.content);  // Store all departments for searching
         setLoading(false);
       })
       .catch((error) => {
@@ -42,7 +41,7 @@ const Departments = () => {
     DepartmentService.createDepartment(department)
       .then(() => {
         setNewDepartment('');
-        fetchDepartments(page);
+        fetchDepartments();
       })
       .catch((error) => {
         console.error('Error creating department:', error);
@@ -64,7 +63,7 @@ const Departments = () => {
     const updatedDepartment = { name: editedDepartmentName };
     DepartmentService.updateDepartment(id, updatedDepartment)
       .then(() => {
-        fetchDepartments(page);
+        fetchDepartments();
         setEditingDepartment(null);
         setEditedDepartmentName('');
       })
@@ -82,30 +81,33 @@ const Departments = () => {
   const deleteDepartment = (id) => {
     DepartmentService.deleteDepartment(id)
       .then(() => {
-        fetchDepartments(page);
+        fetchDepartments();
       })
       .catch((error) => {
         console.error('Error deleting department:', error);
       });
   };
 
-  const nextPage = () => {
-    if (page < totalPages - 1) {
-      setPage(page + 1);
-    }
-  };
-
-  const prevPage = () => {
-    if (page > 0) {
-      setPage(page - 1);
-    }
-  };
+  // Filter departments based on the search term
+  const filteredDepartments = allDepartments.filter((department) =>
+    department.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <Container>
       <Typography variant="h4" gutterBottom>
         Departments
       </Typography>
+
+      {/* Search field for departments */}
+      <TextField
+        label="Search Departments"
+        variant="outlined"
+        fullWidth
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}  // Update search term
+        style={{ marginBottom: '20px' }}
+      />
 
       {/* Create department form */}
       <Grid2 container spacing={2} direction="column">
@@ -134,7 +136,7 @@ const Departments = () => {
           <CircularProgress />
         ) : (
           <Grid2 container spacing={2}>
-            {departments.map((department) => (
+            {filteredDepartments.map((department) => (
               <Grid2 item xs={12} sm={6} md={4} key={department.id}>
                 <Card>
                   <CardContent>
@@ -184,16 +186,6 @@ const Departments = () => {
             </Button>
           </Grid2>
         )}
-
-        {/* Pagination Controls */}
-        <Grid2 item container justifyContent="space-between" style={{ marginTop: '20px' }}>
-          <Button onClick={prevPage} disabled={page === 0}>
-            Previous
-          </Button>
-          <Button onClick={nextPage} disabled={page === totalPages - 1}>
-            Next
-          </Button>
-        </Grid2>
       </Grid2>
     </Container>
   );

@@ -1,18 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import StudentService from '../services/StudentService';
-import { Button, TextField, Container, Grid2, Typography, CircularProgress, Card, CardContent } from '@mui/material';
+import CourseService from '../services/CourseService';  // Import Course Service
+import { Button, TextField, Select, MenuItem, InputLabel, FormControl, CircularProgress, Grid, Typography } from '@mui/material';
 
 const Students = () => {
   const [students, setStudents] = useState([]);
+  const [courses, setCourses] = useState([]);  // State for courses
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [newStudent, setNewStudent] = useState('');
-  const [editingStudent, setEditingStudent] = useState(null); // Track the student being edited
-  const [editedStudentName, setEditedStudentName] = useState(''); // Track the updated name
+  const [newStudentCourse, setNewStudentCourse] = useState('');  // Track course for new student
+  const [newStudentError, setNewStudentError] = useState('');  // Error message for new student name
+  const [newCourseError, setNewCourseError] = useState('');  // Error message for new student course
+  const [editingStudent, setEditingStudent] = useState(null);  // Track the student being edited
+  const [editedStudentName, setEditedStudentName] = useState('');  // Track edited student name
+  const [editedStudentCourse, setEditedStudentCourse] = useState('');  // Track edited student's course
+  const [editStudentNameError, setEditStudentNameError] = useState('');  // Error message for edited student name
+  const [editCourseError, setEditCourseError] = useState('');  // Error message for edited student course
 
   useEffect(() => {
     fetchStudents(page);
+    fetchCourses();  // Fetch courses when component loads
   }, [page]);
 
   // Fetch students with pagination
@@ -30,44 +39,88 @@ const Students = () => {
       });
   };
 
-  // Create a new student
+  // Fetch courses for the dropdown
+  const fetchCourses = () => {
+    CourseService.getAllCourses(0, 100)
+      .then((response) => {
+        setCourses(response.data.content);
+      })
+      .catch((error) => {
+        console.error('Error fetching courses:', error);
+      });
+  };
+
+  // Create a new student with validation
   const createStudent = () => {
-    const student = { name: newStudent };
+    if (!newStudent) {
+      setNewStudentError('Student name cannot be empty');  // Set name error
+      return;
+    }
+    if (!newStudentCourse) {
+      setNewCourseError('Please select a course');  // Set course error
+      return;
+    }
+
+    setNewStudentError('');  // Clear name error
+    setNewCourseError('');  // Clear course error
+
+    const student = {
+      name: newStudent,
+      course: { id: newStudentCourse },  // Set selected course
+    };
+
     StudentService.createStudent(student)
-      .then(() => {
-        setNewStudent(''); // Clear the form
-        fetchStudents(page); // Refresh the student list
+      .then((response) => {
+        setStudents((prevStudents) => [
+          ...prevStudents,
+          { ...response.data, course: courses.find(d => d.id === newStudentCourse) },  // Add the newly created student to the local state
+        ]);
+        setNewStudent('');
+        setNewStudentCourse('');
       })
       .catch((error) => {
         console.error('Error creating student:', error);
       });
   };
 
-  // Delete an student
-  const deleteStudent = (id) => {
-    StudentService.deleteStudent(id)
-      .then(() => {
-        fetchStudents(page); // Refresh the student list after deletion
-      })
-      .catch((error) => {
-        console.error('Error deleting student:', error);
-      });
-  };
-
-  // Start editing an student
+  // Edit student - pre-fill the form with student data
   const editStudent = (student) => {
-    setEditingStudent(student); // Set the student being edited
-    setEditedStudentName(student.name); // Prepopulate the form with the current name
+    setEditingStudent(student);
+    setEditedStudentName(student.name);
+    setEditedStudentCourse(student.course?.id || '');  // Pre-select the course
   };
 
-  // Update the student
+  // Update the student with validation
   const updateStudent = (id) => {
-    const updatedStudent = { name: editedStudentName };
+    if (!editedStudentName) {
+      setEditStudentNameError('Student name cannot be empty');  // Set name error
+      return;
+    }
+    if (!editedStudentCourse) {
+      setEditCourseError('Please select a course');  // Set course error
+      return;
+    }
+
+    setEditStudentNameError('');  // Clear name error
+    setEditCourseError('');  // Clear course error
+
+    const updatedStudent = {
+      name: editedStudentName,
+      course: { id: editedStudentCourse },  // Set selected course
+    };
+
     StudentService.updateStudent(id, updatedStudent)
-      .then(() => {
-        fetchStudents(page); // Refresh the student list after update
-        setEditingStudent(null); // Clear the editing state
-        setEditedStudentName(''); // Clear the form
+      .then((response) => {
+        setStudents((prevStudents) =>
+          prevStudents.map((student) =>
+            student.id === id
+              ? { ...response.data, course: courses.find(d => d.id === editedStudentCourse) }
+              : student
+          )
+        );  // Update the student's course in the local state
+        setEditingStudent(null);  // Clear the editing state
+        setEditedStudentName('');
+        setEditedStudentCourse('');
       })
       .catch((error) => {
         console.error('Error updating student:', error);
@@ -76,104 +129,140 @@ const Students = () => {
 
   // Cancel editing
   const cancelEdit = () => {
-    setEditingStudent(null); // Clear the editing state
-    setEditedStudentName(''); // Clear the form
+    setEditingStudent(null);  // Clear editing state
+    setEditedStudentName('');
+    setEditedStudentCourse('');
+    setEditStudentNameError('');  // Clear validation error
+    setEditCourseError('');  // Clear validation error
   };
 
-  // Handle pagination
-  const nextPage = () => {
-    if (page < totalPages - 1) {
-      setPage(page + 1);
-    }
-  };
-
-  const prevPage = () => {
-    if (page > 0) {
-      setPage(page - 1);
-    }
+  // Delete an student
+  const deleteStudent = (id) => {
+    StudentService.deleteStudent(id)
+      .then(() => {
+        setStudents((prevStudents) => prevStudents.filter(student => student.id !== id));  // Remove student from local state
+      })
+      .catch((error) => {
+        console.error('Error deleting student:', error);
+      });
   };
 
   return (
-    <Container>
+    <div>
       <Typography variant="h4" gutterBottom>
         Students
       </Typography>
 
-      <Grid2 container spacing={2} direction="column">
-        <Grid2 item>
+      {/* Create student form */}
+      <Grid container spacing={2}>
+        <Grid item xs={12}>
           <TextField
             label="Enter Student Name"
-            value={newStudent}
-            onChange={(e) => setNewStudent(e.target.value)}
             variant="outlined"
             fullWidth
+            value={newStudent}
+            onChange={(e) => setNewStudent(e.target.value)}
+            error={!!newStudentError}  // Apply error state
+            helperText={newStudentError}  // Display error message
           />
-          <Button variant="contained" color="primary" onClick={createStudent} style={{ marginTop: '10px' }}>
+        </Grid>
+        <Grid item xs={12}>
+          <FormControl fullWidth variant="outlined" error={!!newCourseError}>
+            <InputLabel>Select Course</InputLabel>
+            <Select
+              value={newStudentCourse}
+              onChange={(e) => setNewStudentCourse(e.target.value)}
+              label="Select Course"
+            >
+              {courses.map((course) => (
+                <MenuItem key={course.id} value={course.id}>
+                  {course.name}
+                </MenuItem>
+              ))}
+            </Select>
+            {newCourseError && <Typography variant="caption" color="error">{newCourseError}</Typography>}
+          </FormControl>
+        </Grid>
+        <Grid item xs={12}>
+          <Button
+            variant="contained"
+            color="primary"
+            fullWidth
+            onClick={createStudent}
+          >
             Add Student
           </Button>
-        </Grid2>
+        </Grid>
+      </Grid>
 
-        {loading ? (
-          <CircularProgress />
-        ) : (
-          <Grid2 item container spacing={2}>
-            {students.map((student) => (
-              <Grid2 item xs={12} sm={6} md={4} key={student.id}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6">{student.name}</Typography>
-                    <Button color="secondary" onClick={() => deleteStudent(student.id)}>
-                      Delete
-                    </Button>
-                    <Button color="primary" onClick={() => editStudent(student)}>
-                      Edit
-                    </Button>
-                  </CardContent>
-                </Card>
-              </Grid2>
-            ))}
-          </Grid2>
-        )}
+      {/* Student list */}
+      {loading ? (
+        <CircularProgress />
+      ) : (
+        <ul>
+          {students.map((student) => (
+            <li key={student.id}>
+              {student.name} (Course: {student.course?.name || 'None'})
+              <Button onClick={() => editStudent(student)}>Edit</Button>
+              <Button color="secondary" onClick={() => deleteStudent(student.id)}>Delete</Button>
+            </li>
+          ))}
+        </ul>
+      )}
 
-        {editingStudent && (
-          <Grid2 item>
+      {/* Edit student form */}
+      {editingStudent && (
+        <Grid container spacing={2} style={{ marginTop: '20px' }}>
+          <Grid item xs={12}>
             <TextField
               label="Edit Student Name"
-              value={editedStudentName}
-              onChange={(e) => setEditedStudentName(e.target.value)}
               variant="outlined"
               fullWidth
+              value={editedStudentName}
+              onChange={(e) => setEditedStudentName(e.target.value)}
+              error={!!editStudentNameError}  // Apply error state
+              helperText={editStudentNameError}  // Display error message
             />
+          </Grid>
+          <Grid item xs={12}>
+            <FormControl fullWidth variant="outlined" error={!!editCourseError}>
+              <InputLabel>Edit Course</InputLabel>
+              <Select
+                value={editedStudentCourse}
+                onChange={(e) => setEditedStudentCourse(e.target.value)}
+                label="Edit Course"
+              >
+                {courses.map((course) => (
+                  <MenuItem key={course.id} value={course.id}>
+                    {course.name}
+                  </MenuItem>
+                ))}
+              </Select>
+              {editCourseError && <Typography variant="caption" color="error">{editCourseError}</Typography>}
+            </FormControl>
+          </Grid>
+          <Grid item xs={12}>
             <Button
               variant="contained"
               color="primary"
+              fullWidth
               onClick={() => updateStudent(editingStudent.id)}
-              style={{ marginTop: '10px' }}
             >
-              Save
+              Save Changes
             </Button>
             <Button
               variant="outlined"
               color="secondary"
+              fullWidth
               onClick={cancelEdit}
-              style={{ marginTop: '10px', marginLeft: '10px' }}
+              style={{ marginTop: '10px' }}
             >
               Cancel
             </Button>
-          </Grid2>
-        )}
-
-        {/* Pagination Controls */}
-        <Grid2 item container justifyContent="space-between" style={{ marginTop: '20px' }}>
-          <Button onClick={prevPage} disabled={page === 0}>
-            Previous
-          </Button>
-          <Button onClick={nextPage} disabled={page === totalPages - 1}>
-            Next
-          </Button>
-        </Grid2>
-      </Grid2>
-    </Container>
+          </Grid>
+        </Grid>
+      )}
+    </div>
   );
 };
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import CourseService from '../services/CourseService';
-import { Button, TextField, Container, Grid2, Typography, CircularProgress, Card, CardContent } from '@mui/material';
+import { Button, TextField, Card, CardContent, CardActions, Typography, Grid2, CircularProgress, Container } from '@mui/material';
 
 const Courses = () => {
   const [courses, setCourses] = useState([]);
@@ -8,14 +8,16 @@ const Courses = () => {
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [newCourse, setNewCourse] = useState('');
-  const [editingCourse, setEditingCourse] = useState(null); // Track the course being edited
-  const [editedCourseName, setEditedCourseName] = useState(''); // Track the updated name
+  const [newCourseError, setNewCourseError] = useState('');  // For validation
+  const [editingCourse, setEditingCourse] = useState(null);
+  const [editedCourseName, setEditedCourseName] = useState('');
+  const [editedCourseError, setEditedCourseError] = useState('');  // For validation
+  const [searchTerm, setSearchTerm] = useState('');  // Add search term state
 
   useEffect(() => {
     fetchCourses(page);
   }, [page]);
 
-  // Fetch courses with pagination
   const fetchCourses = (page) => {
     setLoading(true);
     CourseService.getAllCourses(page, 5)
@@ -30,57 +32,64 @@ const Courses = () => {
       });
   };
 
-  // Create a new course
   const createCourse = () => {
+    if (!newCourse) {
+      setNewCourseError('Course name cannot be empty');  // Show error
+      return;
+    }
+    setNewCourseError('');  // Clear the error when valid
+
     const course = { name: newCourse };
     CourseService.createCourse(course)
       .then(() => {
-        setNewCourse(''); // Clear the form
-        fetchCourses(page); // Refresh the course list
+        setNewCourse('');
+        fetchCourses(page);
       })
       .catch((error) => {
         console.error('Error creating course:', error);
       });
   };
 
-  // Delete a course
-  const deleteCourse = (id) => {
-    CourseService.deleteCourse(id)
-      .then(() => {
-        fetchCourses(page); // Refresh the course list after deletion
-      })
-      .catch((error) => {
-        console.error('Error deleting course:', error);
-      });
-  };
-
-  // Start editing a course
   const editCourse = (course) => {
-    setEditingCourse(course); // Set the course being edited
-    setEditedCourseName(course.name); // Prepopulate the form with the current name
+    setEditingCourse(course);
+    setEditedCourseName(course.name);
   };
 
-  // Update the course
   const updateCourse = (id) => {
+    if (!editedCourseName) {
+      setEditedCourseError('Course name cannot be empty');  // Show error
+      return;
+    }
+    setEditedCourseError('');  // Clear the error when valid
+
     const updatedCourse = { name: editedCourseName };
     CourseService.updateCourse(id, updatedCourse)
       .then(() => {
-        fetchCourses(page); // Refresh the course list after update
-        setEditingCourse(null); // Clear the editing state
-        setEditedCourseName(''); // Clear the form
+        fetchCourses(page);
+        setEditingCourse(null);
+        setEditedCourseName('');
       })
       .catch((error) => {
         console.error('Error updating course:', error);
       });
   };
 
-  // Cancel editing
   const cancelEdit = () => {
-    setEditingCourse(null); // Clear the editing state
-    setEditedCourseName(''); // Clear the form
+    setEditingCourse(null);
+    setEditedCourseName('');
+    setEditedCourseError('');  // Clear validation error
   };
 
-  // Handle pagination
+  const deleteCourse = (id) => {
+    CourseService.deleteCourse(id)
+      .then(() => {
+        fetchCourses(page);
+      })
+      .catch((error) => {
+        console.error('Error deleting course:', error);
+      });
+  };
+
   const nextPage = () => {
     if (page < totalPages - 1) {
       setPage(page + 1);
@@ -93,12 +102,28 @@ const Courses = () => {
     }
   };
 
+  // Dynamic filtering for search
+  const filteredCourses = courses.filter((course) =>
+    course.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <Container>
       <Typography variant="h4" gutterBottom>
         Courses
       </Typography>
 
+      {/* Search field for courses */}
+      <TextField
+        label="Search Courses"
+        variant="outlined"
+        fullWidth
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}  // Update search term as user types
+        style={{ marginBottom: '20px' }}
+      />
+
+      {/* Create course form */}
       <Grid2 container spacing={2} direction="column">
         <Grid2 item>
           <TextField
@@ -107,34 +132,45 @@ const Courses = () => {
             onChange={(e) => setNewCourse(e.target.value)}
             variant="outlined"
             fullWidth
+            error={!!newCourseError}  // Apply error state to the text field
+            helperText={newCourseError}  // Display error message
           />
-          <Button variant="contained" color="primary" onClick={createCourse} style={{ marginTop: '10px' }}>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={createCourse}
+            style={{ marginTop: '10px' }}
+          >
             Add Course
           </Button>
         </Grid2>
 
+        {/* List of courses */}
         {loading ? (
           <CircularProgress />
         ) : (
-          <Grid2 item container spacing={2}>
-            {courses.map((course) => (
+          <Grid2 container spacing={2}>
+            {filteredCourses.map((course) => (  // Use filteredCourses for dynamic search
               <Grid2 item xs={12} sm={6} md={4} key={course.id}>
                 <Card>
                   <CardContent>
                     <Typography variant="h6">{course.name}</Typography>
+                  </CardContent>
+                  <CardActions>
                     <Button color="secondary" onClick={() => deleteCourse(course.id)}>
                       Delete
                     </Button>
                     <Button color="primary" onClick={() => editCourse(course)}>
                       Edit
                     </Button>
-                  </CardContent>
+                  </CardActions>
                 </Card>
               </Grid2>
             ))}
           </Grid2>
         )}
 
+        {/* Edit course form */}
         {editingCourse && (
           <Grid2 item>
             <TextField
@@ -143,6 +179,8 @@ const Courses = () => {
               onChange={(e) => setEditedCourseName(e.target.value)}
               variant="outlined"
               fullWidth
+              error={!!editedCourseError}  // Apply error state to the text field
+              helperText={editedCourseError}  // Display error message
             />
             <Button
               variant="contained"
